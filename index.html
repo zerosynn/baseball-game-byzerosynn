@@ -9,7 +9,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, push, onValue, query, orderByChild, limitToFirst }
+  import { getDatabase, ref, push, onValue }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   // ══════════════════════════════════════════════
@@ -29,6 +29,8 @@
   const app = initializeApp(firebaseConfig);
   const db  = getDatabase(app);
 
+  window._fbDB = db;
+
   window._fb = {
     saveScore: async (name, tries) => {
       await push(ref(db, "leaderboard"), {
@@ -44,6 +46,9 @@
       });
     }
   };
+
+  // Firebase 준비되면 리더보드 자동 구독 시작
+  document.dispatchEvent(new CustomEvent("firebase-ready"));
 </script>
 
 <style>
@@ -683,15 +688,15 @@ function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// Watch Firebase realtime
-if (window._fb) {
+// Watch Firebase realtime - firebase-ready 이벤트 후 구독
+document.addEventListener('firebase-ready', () => {
   window._fb.watchLeaderboard(rows => {
     boardData = rows;
     document.getElementById('boardStatus').textContent = rows.length+'명 참여';
     const tab = document.getElementById('tab-board');
     if (tab.classList.contains('active')) renderBoard();
   });
-}
+});
 
 // ── Boot ──────────────────────────────────────────
 initGame();
