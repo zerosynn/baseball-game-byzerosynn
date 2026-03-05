@@ -9,7 +9,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, push, onValue }
+  import { getDatabase, ref, push, onValue, get }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   // ══════════════════════════════════════════════
@@ -40,10 +40,15 @@
     watchLeaderboard: (cb) => {
       onValue(ref(db, "leaderboard"), snap => {
         const rows = [];
-        snap.forEach(c => rows.push(c.val()));
+        if (snap.exists()) {
+          snap.forEach(child => {
+            const val = child.val();
+            if (val && typeof val.tries === "number") rows.push(val);
+          });
+        }
         rows.sort((a,b) => a.tries - b.tries || a.ts - b.ts);
         cb(rows.slice(0, 20));
-      });
+      }, { onlyOnce: false });
     }
   };
 
