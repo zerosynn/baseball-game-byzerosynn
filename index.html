@@ -36,12 +36,11 @@
       });
     },
     watchLeaderboard: (cb) => {
-      const q = query(ref(db, "leaderboard"), orderByChild("tries"), limitToFirst(20));
-      onValue(q, snap => {
+      onValue(ref(db, "leaderboard"), snap => {
         const rows = [];
         snap.forEach(c => rows.push(c.val()));
         rows.sort((a,b) => a.tries - b.tries || a.ts - b.ts);
-        cb(rows);
+        cb(rows.slice(0, 20));
       });
     }
   };
@@ -235,6 +234,25 @@ header {
   background: rgba(255,68,85,.06);
 }
 
+.newgame-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 11px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: .82rem;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: border-color .2s, color .2s, background .2s;
+}
+.newgame-btn:hover {
+  border-color: var(--accent2);
+  color: var(--accent2);
+  background: rgba(255,107,53,.06);
+}
+
 /* ── History ── */
 .hist-list { max-height: 280px; overflow-y: auto; }
 .hist-list::-webkit-scrollbar { width: 3px; }
@@ -259,7 +277,7 @@ header {
   padding: 3px 9px;
   border-radius: 20px;
   font-family: 'Share Tech Mono', monospace;
-  font-size: .68rem;
+  font-size: .82rem;
   font-weight: bold;
   border: 1px solid;
 }
@@ -430,6 +448,7 @@ header {
         <button class="throw-btn" id="throwBtn" onclick="submitGuess()" disabled>⚾ 던지기</button>
         <button class="reset-btn" title="입력 초기화" onclick="clearInputs()">⌫</button>
       </div>
+      <button class="newgame-btn" onclick="initGame()">🔄 새 게임</button>
     </div>
 
     <!-- History -->
