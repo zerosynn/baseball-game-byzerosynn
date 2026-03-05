@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚾ 숫자야구</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@300;400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, push, onValue, query, orderByChild, limitToFirst }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  // ══════════════════════════════════════════════
+  //  🔥 여기에 Firebase 설정을 붙여넣으세요
+  // ══════════════════════════════════════════════
+  const firebaseConfig = {
+    apiKey:            "YOUR_API_KEY",
+    authDomain:        "YOUR_PROJECT.firebaseapp.com",
+    databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+    projectId:         "YOUR_PROJECT",
+    storageBucket:     "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId:             "YOUR_APP_ID"
+  };
+  // ══════════════════════════════════════════════
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  window._fb = {
+    saveScore: async (name, tries) => {
+      await push(ref(db, "leaderboard"), {
+        name, tries, ts: Date.now()
+      });
+    },
+    watchLeaderboard: (cb) => {
+      const q = query(ref(db, "leaderboard"), orderByChild("tries"), limitToFirst(20));
+      onValue(q, snap => {
+        const rows = [];
+        snap.forEach(c => rows.push(c.val()));
+        rows.sort((a,b) => a.tries - b.tries || a.ts - b.ts);
+        cb(rows);
+      });
+    }
+  };
+</script>
+
+<style>
+:root {
+  --bg:      #07090f;
+  --panel:   #0f1520;
+  --border:  #1a3050;
+  --accent:  #00d4ff;
+  --accent2: #ff6b35;
+  --strike:  #00ff88;
+  --ball:    #ffd700;
+  --danger:  #ff4455;
+  --text:    #ddeeff;
+  --muted:   #3a5570;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans KR', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px 64px;
+  background-image:
+    radial-gradient(ellipse at 15% 10%, rgba(0,212,255,.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 85%, rgba(255,107,53,.06) 0%, transparent 50%);
+}
+
+/* ── Header ── */
+header {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+.logo {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 2.4rem;
+  letter-spacing: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1;
+}
+.logo small {
+  display: block;
+  font-size: .6rem;
+  letter-spacing: 5px;
+  color: var(--muted);
+  -webkit-text-fill-color: var(--muted);
+  margin-top: 3px;
+}
+.tab-btns { display: flex; gap: 8px; }
+.tab-btn {
+  padding: 7px 14px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: .72rem;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.tab-btn.active, .tab-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Main wrap ── */
+.wrap { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ── Status bar ── */
+.status-bar {
+  display: flex;
+  justify-content: space-around;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.stat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.stat-label { font-size: .6rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+.stat-val { font-family: 'Share Tech Mono', monospace; font-size: 1.5rem; }
+
+/* ── Card ── */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 22px;
+}
+.card-title {
+  font-size: .62rem;
+  color: var(--muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+/* ── Digit inputs ── */
+.digit-row { display: flex; gap: 12px; justify-content: center; margin-bottom: 14px; }
+
+.digit-box {
+  width: 78px;
+  height: 78px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 2.2rem;
+  color: var(--accent);
+  text-align: center;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s, background .2s;
+  position: relative;
+  caret-color: transparent;  /* 기본 커서 숨김 */
+}
+
+/* focus 시 글로우 + 깜빡이는 가상 커서 */
+.digit-box:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,212,255,.15), 0 0 20px rgba(0,212,255,.2);
+  background: rgba(0,212,255,.05);
+}
+
+/* 커서 깜빡임: 빈 input에 ::placeholder로 구현 */
+.digit-box:focus::placeholder { opacity: 0; }
+.digit-box:focus:placeholder-shown {
+  background-image: linear-gradient(var(--accent), var(--accent));
+  background-repeat: no-repeat;
+  background-size: 2px 44%;
+  background-position: center;
+  animation: blink 1s step-start infinite;
+}
+@keyframes blink {
+  0%, 100% { background-color: rgba(0,212,255,.05); }
+  50%       { background-color: rgba(0,212,255,.1); }
+}
+
+/* 값 있을 때 */
+.digit-box.filled {
+  border-color: var(--accent);
+  background: rgba(0,212,255,.07);
+}
+
+/* ── Button row ── */
+.btn-row { display: flex; gap: 10px; }
+
+.throw-btn {
+  flex: 1;
+  padding: 15px;
+  background: linear-gradient(135deg, var(--accent), #0099cc);
+  border: none;
+  border-radius: 12px;
+  color: #000;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 3px;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0,212,255,.3);
+  transition: transform .12s, box-shadow .2s, opacity .2s;
+}
+.throw-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 26px rgba(0,212,255,.45);
+}
+.throw-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+.reset-btn {
+  padding: 15px 18px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: border-color .2s, color .2s, background .2s;
+}
+.reset-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: rgba(255,68,85,.06);
+}
+
+/* ── History ── */
+.hist-list { max-height: 280px; overflow-y: auto; }
+.hist-list::-webkit-scrollbar { width: 3px; }
+.hist-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.hist-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(26,48,80,.6);
+  animation: slideIn .25s ease;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.hist-no   { font-size: .65rem; color: var(--muted); width: 18px; text-align: right; flex-shrink: 0; }
+.hist-num  { font-family: 'Share Tech Mono', monospace; font-size: 1.35rem; letter-spacing: 8px; flex: 1; }
+.badges    { display: flex; gap: 5px; flex-shrink: 0; }
+.badge {
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: .68rem;
+  font-weight: bold;
+  border: 1px solid;
+}
+.bs { color: var(--strike); border-color: var(--strike); background: rgba(0,255,136,.08); }
+.bb { color: var(--ball);   border-color: var(--ball);   background: rgba(255,215,0,.08); }
+.bo { color: var(--danger); border-color: var(--danger); background: rgba(255,68,85,.08); }
+
+.empty { color: var(--muted); font-size: .82rem; text-align: center; padding: 20px 0; line-height: 1.9; }
+
+/* ── Rule ── */
+.rule { font-size: .72rem; color: var(--muted); text-align: center; line-height: 2; }
+
+/* ── Result overlay ── */
+.overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.88);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
+.overlay.show { display: flex; }
+.result-card {
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 24px;
+  padding: 44px 36px;
+  text-align: center;
+  max-width: 340px;
+  width: 90%;
+  box-shadow: 0 0 60px rgba(0,212,255,.2);
+  animation: popIn .4s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes popIn {
+  from { transform: scale(.7); opacity: 0; }
+  to   { transform: scale(1);  opacity: 1; }
+}
+.result-emoji { font-size: 4rem; margin-bottom: 14px; }
+.result-title {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 2rem;
+  margin-bottom: 10px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.result-desc { color: var(--muted); font-size: .88rem; line-height: 1.8; margin-bottom: 24px; }
+.result-desc strong { font-family: 'Share Tech Mono', monospace; color: var(--accent); font-size: 1.15rem; }
+
+.save-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.save-label { font-size: .7rem; color: var(--muted); margin-bottom: 10px; letter-spacing: 1px; }
+.save-row { display: flex; gap: 8px; }
+.name-input {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: .88rem;
+  outline: none;
+  transition: border-color .2s;
+}
+.name-input:focus { border-color: var(--accent); }
+.save-btn {
+  padding: 10px 16px;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: .85rem;
+  transition: opacity .2s;
+}
+.save-btn:disabled { opacity: .35; cursor: not-allowed; }
+.saved-msg { color: var(--strike); font-size: .85rem; margin-bottom: 20px; }
+
+.result-btns { display: flex; gap: 10px; justify-content: center; }
+.btn-outline {
+  padding: 12px 22px;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: .88rem;
+  transition: background .2s, color .2s;
+}
+.btn-cyan  { border: 1px solid var(--accent);  color: var(--accent); }
+.btn-gold  { border: 1px solid var(--ball);    color: var(--ball); }
+.btn-cyan:hover  { background: var(--accent);  color: #000; }
+.btn-gold:hover  { background: var(--ball);    color: #000; }
+
+/* ── Leaderboard ── */
+.board-list { display: flex; flex-direction: column; gap: 8px; }
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  animation: slideIn .2s ease;
+}
+.board-row.top1 { border-color: rgba(255,215,0,.5); background: rgba(255,215,0,.04); }
+.board-rank { font-size: 1rem; width: 28px; text-align: center; flex-shrink: 0; }
+.board-name { flex: 1; font-weight: 700; font-size: .92rem; }
+.board-tries { font-family: 'Share Tech Mono', monospace; color: var(--accent); font-size: 1rem; font-weight: bold; }
+
+.board-loading { color: var(--muted); font-size: .85rem; text-align: center; padding: 24px 0; }
+
+/* ── Tab visibility ── */
+.tab { display: none; }
+.tab.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    ⚾ 숫자야구
+    <small>NUMBER BASEBALL · 3 DIGITS</small>
+  </div>
+  <div class="tab-btns">
+    <button class="tab-btn active" onclick="switchTab('game')">🎮 게임</button>
+    <button class="tab-btn" onclick="switchTab('board')" id="boardTabBtn">🏆 순위</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- Status -->
+  <div class="status-bar">
+    <div class="stat">
+      <div class="stat-label">시도</div>
+      <div class="stat-val" id="statTry" style="color:var(--accent)">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">남은기회</div>
+      <div class="stat-val" id="statLeft" style="color:var(--accent2)">10</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">내최고</div>
+      <div class="stat-val" id="statBest" style="color:var(--strike)">—</div>
+    </div>
+  </div>
+
+  <!-- GAME TAB -->
+  <div class="tab active" id="tab-game">
+
+    <!-- Input card -->
+    <div class="card" id="inputCard">
+      <div class="card-title">숫자를 입력하세요 (중복 없이)</div>
+      <div class="digit-row">
+        <input class="digit-box" id="d0" type="tel" inputmode="numeric" maxlength="1" placeholder=" ">
+        <input class="digit-box" id="d1" type="tel" inputmode="numeric" maxlength="1" placeholder=" ">
+        <input class="digit-box" id="d2" type="tel" inputmode="numeric" maxlength="1" placeholder=" ">
+      </div>
+      <div class="btn-row">
+        <button class="throw-btn" id="throwBtn" onclick="submitGuess()" disabled>⚾ 던지기</button>
+        <button class="reset-btn" title="입력 초기화" onclick="clearInputs()">⌫</button>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="card">
+      <div class="card-title">투구 기록 <span id="histCount" style="color:var(--muted)">0 / 10</span></div>
+      <div class="hist-list" id="histList">
+        <div class="empty">아직 투구 기록이 없어요.<br>숫자를 입력하고 <strong style="color:var(--accent)">던지기</strong>를 누르세요!</div>
+      </div>
+    </div>
+
+    <!-- Rule -->
+    <div class="rule">
+      <span style="color:var(--strike)">⚡ 스트라이크</span> 숫자·자리 일치 &nbsp;·&nbsp;
+      <span style="color:var(--ball)">🔥 볼</span> 숫자만 일치 &nbsp;·&nbsp;
+      <span style="color:var(--danger)">💀 아웃</span> 없는 숫자
+    </div>
+  </div>
+
+  <!-- LEADERBOARD TAB -->
+  <div class="tab" id="tab-board">
+    <div class="card">
+      <div class="card-title">🏆 명예의 전당 <span id="boardStatus" style="color:var(--muted);float:right;font-size:.65rem;letter-spacing:1px"></span></div>
+      <div id="boardContent">
+        <div class="board-loading">불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<!-- Result Overlay -->
+<div class="overlay" id="overlay">
+  <div class="result-card">
+    <div class="result-emoji" id="rEmoji"></div>
+    <div class="result-title" id="rTitle"></div>
+    <div class="result-desc" id="rDesc"></div>
+
+    <div class="save-box" id="saveBox">
+      <div class="save-label">이름을 남겨 리더보드에 등록하세요 👇</div>
+      <div class="save-row">
+        <input class="name-input" id="nameInput" placeholder="닉네임 (최대 12자)" maxlength="12"
+               onkeydown="if(event.key==='Enter') saveScore()">
+        <button class="save-btn" id="saveBtn" onclick="saveScore()" disabled>등록</button>
+      </div>
+    </div>
+    <div class="saved-msg" id="savedMsg" style="display:none">✅ 리더보드에 등록됐어요!</div>
+
+    <div class="result-btns">
+      <button class="btn-outline btn-cyan" onclick="restartGame()">🔄 다시하기</button>
+      <button class="btn-outline btn-gold" onclick="overlay.classList.remove('show'); switchTab('board')">🏆 순위보기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Game state ────────────────────────────────────
+let secret = [], tries = 0, bestRecord = null, gameOver = false;
+const MAX = 10, DIGITS = 3;
+const inputs = [0,1,2].map(i => document.getElementById('d'+i));
+
+function gen() {
+  const p = [1,2,3,4,5,6,7,8,9,0];
+  for (let i=p.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[p[i],p[j]]=[p[j],p[i]];}
+  return p.slice(0,DIGITS).map(String);
+}
+
+function initGame() {
+  secret = gen(); tries = 0; gameOver = false;
+  updateStatus();
+  document.getElementById('histList').innerHTML = `<div class="empty">아직 투구 기록이 없어요.<br>숫자를 입력하고 <strong style="color:var(--accent)">던지기</strong>를 누르세요!</div>`;
+  document.getElementById('histCount').textContent = '0 / 10';
+  clearInputs();
+}
+
+function clearInputs() {
+  inputs.forEach(inp => { inp.value=''; inp.classList.remove('filled'); });
+  document.getElementById('throwBtn').disabled = true;
+  inputs[0].focus();
+}
+
+function updateStatus() {
+  document.getElementById('statTry').textContent  = tries;
+  document.getElementById('statLeft').textContent = MAX - tries;
+  document.getElementById('statBest').textContent = bestRecord ? bestRecord+'번' : '—';
+}
+
+// ── Input wiring ──────────────────────────────────
+inputs.forEach((inp, idx) => {
+  inp.addEventListener('input', () => {
+    let v = inp.value.replace(/\D/g,'');
+    inp.value = v ? v.slice(-1) : '';
+    inp.classList.toggle('filled', !!inp.value);
+    if (inp.value && idx < 2) inputs[idx+1].focus();
+    checkReady();
+  });
+  inp.addEventListener('keydown', e => {
+    if (e.key==='Backspace' && !inp.value && idx>0) {
+      inputs[idx-1].value=''; inputs[idx-1].classList.remove('filled');
+      inputs[idx-1].focus(); checkReady();
+    }
+    if (e.key==='Enter') submitGuess();
+  });
+});
+
+function checkReady() {
+  const vals = inputs.map(i=>i.value);
+  document.getElementById('throwBtn').disabled =
+    !(vals.every(v=>v!=='') && new Set(vals).size===DIGITS) || gameOver;
+}
+
+// ── Submit ────────────────────────────────────────
+function submitGuess() {
+  if (gameOver) return;
+  const guess = inputs.map(i=>i.value);
+  if (guess.length!==DIGITS || new Set(guess).size!==DIGITS) return;
+
+  let s=0, b=0;
+  for (let i=0;i<DIGITS;i++){
+    if (guess[i]===secret[i]) s++;
+    else if (secret.includes(guess[i])) b++;
+  }
+  const o = DIGITS-s-b;
+  tries++;
+  addHistory(guess, s, b, o);
+  updateStatus();
+
+  if (s===DIGITS) {
+    if (!bestRecord || tries<bestRecord) bestRecord = tries;
+    updateStatus();
+    gameOver = true;
+    setTimeout(()=>showResult(true), 380);
+  } else if (tries>=MAX) {
+    gameOver = true;
+    setTimeout(()=>showResult(false), 380);
+  } else {
+    clearInputs();
+  }
+  document.getElementById('histCount').textContent = tries+' / '+MAX;
+}
+
+function addHistory(guess, s, b, o) {
+  const list = document.getElementById('histList');
+  const empty = list.querySelector('.empty');
+  if (empty) list.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'hist-row';
+  row.innerHTML = `
+    <div class="hist-no">${tries}</div>
+    <div class="hist-num">${guess.join(' ')}</div>
+    <div class="badges">
+      ${s>0?`<span class="badge bs">${s}S</span>`:''}
+      ${b>0?`<span class="badge bb">${b}B</span>`:''}
+      ${o>0?`<span class="badge bo">${o}O</span>`:''}
+      ${s===0&&b===0?`<span class="badge bo">OUT</span>`:''}
+    </div>`;
+  list.prepend(row);
+}
+
+// ── Result overlay ────────────────────────────────
+function showResult(win) {
+  document.getElementById('rEmoji').textContent = win ? '🏆' : '💀';
+  document.getElementById('rTitle').textContent = win ? '홈런!' : '삼진아웃!';
+  document.getElementById('rDesc').innerHTML = win
+    ? `<strong>${secret.join('')}</strong> 정답!<br>${tries}번 만에 클리어했어요 ${tries<=3?'🔥 천재?!':tries<=6?'👏 훌륭해요!':'😅 아슬아슬!'}`
+    : `10번을 모두 사용했어요.<br>정답은 <strong>${secret.join('')}</strong> 이었어요.`;
+
+  const saveBox = document.getElementById('saveBox');
+  saveBox.style.display = win ? 'block' : 'none';
+  document.getElementById('savedMsg').style.display = 'none';
+
+  document.getElementById('overlay').classList.add('show');
+}
+
+// ── Save score to Firebase ────────────────────────
+document.getElementById('nameInput').addEventListener('input', e => {
+  document.getElementById('saveBtn').disabled = !e.target.value.trim();
+});
+
+async function saveScore() {
+  const name = document.getElementById('nameInput').value.trim().slice(0,12);
+  if (!name || !window._fb) return;
+  document.getElementById('saveBtn').disabled = true;
+  document.getElementById('saveBtn').textContent = '...';
+  try {
+    await window._fb.saveScore(name, tries);
+    document.getElementById('saveBox').style.display = 'none';
+    document.getElementById('savedMsg').style.display = 'block';
+  } catch(e) {
+    alert('저장 실패: Firebase 설정을 확인해주세요.');
+    document.getElementById('saveBtn').disabled = false;
+    document.getElementById('saveBtn').textContent = '등록';
+  }
+}
+
+function restartGame() {
+  document.getElementById('overlay').classList.remove('show');
+  initGame();
+  switchTab('game');
+}
+
+// ── Tab switching ─────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.tab-btn')[name==='game'?0:1].classList.add('active');
+  if (name==='board') renderBoard();
+}
+
+// ── Leaderboard ───────────────────────────────────
+let boardData = [];
+
+function renderBoard() {
+  const el = document.getElementById('boardContent');
+  if (!window._fb) {
+    el.innerHTML = `<div class="board-loading" style="color:#ff6b35">⚠️ Firebase 미설정<br><small style="color:var(--muted)">firebaseConfig를 입력해주세요</small></div>`;
+    return;
+  }
+  if (boardData.length === 0) {
+    el.innerHTML = `<div class="empty">아직 기록이 없어요.<br>첫 번째 도전자가 되어보세요!</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="board-list">${boardData.map((e,i) => `
+    <div class="board-row ${i===0?'top1':''}">
+      <div class="board-rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</div>
+      <div class="board-name">${escHtml(e.name)}</div>
+      <div class="board-tries">${e.tries}번</div>
+    </div>`).join('')}</div>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Watch Firebase realtime
+if (window._fb) {
+  window._fb.watchLeaderboard(rows => {
+    boardData = rows;
+    document.getElementById('boardStatus').textContent = rows.length+'명 참여';
+    const tab = document.getElementById('tab-board');
+    if (tab.classList.contains('active')) renderBoard();
+  });
+}
+
+// ── Boot ──────────────────────────────────────────
+initGame();
+</script>
+</body>
+</html>
